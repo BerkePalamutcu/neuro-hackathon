@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .chessboard {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            border: 2px solid #333;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .square {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .white {
+            background-color: #f0d9b5;
+        }
+        
+        .black {
+            background-color: #b58863;
+        }
+        
+        .square.selected {
+            background-color: #7389AE;
+        }
+        
+        .square.valid-move {
+            position: relative;
+        }
+        
+        .square.valid-move::after {
+            content: "";
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+        }
+        
+        .square.valid-capture::after {
+            content: "";
+            position: absolute;
+            width: 54px;
+            height: 54px;
+            border: 3px solid rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+        }
+        
+        .status {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .promotion-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .promotion-options {
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            gap: 10px;
+        }
+        
+        .promotion-option {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 24px;
+        }
+        
+        .promotion-option:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .disconnected {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chess Game</h1>
+    
+    <div class="game-container">
+        <div class="chessboard" id="chessboard"></div>
+        <div class="status" id="status">White to move</div>
+        <div class="controls">
+            <button id="new-game">New Game</button>
+            <button id="switch-perspective">Switch Perspective</button>
+        </div>
+    </div>
+    
+    <div class="connection-status" id="connection-status">Connecting...</div>
+    
+    <div class="promotion-modal" id="promotion-modal">
+        <div class="promotion-options">
+            <h3>Promote pawn to:</h3>
+            <div class="promotion-option" data-piece="queen">♛</div>
+            <div class="promotion-option" data-piece="rook">♜</div>
+            <div class="promotion-option" data-piece="bishop">♝</div>
+            <div class="promotion-option" data-piece="knight">♞</div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Constants and variables
+            const API_URL = 'http://localhost:8000';
+            const WS_URL = 'ws://localhost:8000/ws';
+            
+            let socket = null;
+            let board = null;
+            let selectedSquare = null;
+            let validMoves = [];
+            let gameState = {
+                board: null,
+                currentPlayer: 'white',
+                castlingRights: {
+                    white: { kingSide: true, queenSide: true },
+                    black: { kingSide: true, queenSide: true }
+                },
+                check: false,
+                checkmate: false,
+                stalemate: false
+            };
+            let perspective = 'white'; // Default perspective
+            let promotionCallback = null;
+            
+            // DOM Elements
+            const chessboardElement = document.getElementById('chessboard');
+            const statusElement = document.getElementById('status');
+            const newGameButton = document.getElementById('new-game');
+            const switchPerspectiveButton = document.getElementById('switch-perspective');
+            const connectionStatusElement = document.getElementById('connection-status');
+            const promotionModal = document.getElementById('promotion-modal');
+            const promotionOptions = document.querySelectorAll('.promotion-option');
+            
+            // Chess piece Unicode characters
+            const pieces = {
+                white: {
+                    pawn: '♙',
+                    rook: '♖',
+                    knight: '♘',
+                    bishop: '♗',
+                    queen: '♕',
+                    king: '♔'
+                },
+                black: {
+                    pawn: '♟',
+                    rook: '♜',
+                    knight: '♞',
+                    bishop: '♝',
+                    queen: '♛',
+                    king: '♚'
+                }
+            };
+            
+            // Initialize WebSocket connection
+            function initWebSocket() {
+                socket = new WebSocket(WS_URL);
+                
+                socket.onopen = () => {
+                    connectionStatusElement.textContent = 'Connected';
+                    connectionStatusElement.classList.add('connected');
+                    connectionStatusElement.classList.remove('disconnected');
+                    console.log('WebSocket connection established');
+                };
+                
+                socket.onclose = () => {
+                    connectionStatusElement.textContent = 'Disconnected';
+                    connectionStatusElement.classList.add('disconnected');
+                    connectionStatusElement.classList.remove('connected');
+                    console.log('WebSocket connection closed');
+                    
+                    // Try to reconnect after a delay
+                    setTimeout(initWebSocket, 5000);
+                };
+                
+                socket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                };
+                
+                socket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    console.log('WebSocket message received:', data);
+                    
+                    if (data.type === 'game_state') {
+                        updateGameState(data.state);
+                    }
+                };
+            }
+            
+            // Initialize the chessboard
+            function initChessboard() {
+                chessboardElement.innerHTML = '';
+                
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const square = document.createElement('div');
+                        square.classList.add('square');
+                        
+                        // Determine if the square is white or black
+                        if ((row + col) % 2 === 0) {
+                            square.classList.add('white');
+                        } else {
+                            square.classList.add('black');
+                        }
+                        
+                        // Set data attributes for position
+                        const actualRow = perspective === 'white' ? 7 - row : row;
+                        const actualCol = perspective === 'white' ? col : 7 - col;
+                        
+                        square.dataset.row = actualRow;
+                        square.dataset.col = actualCol;
+                        
+                        // Add event listener for clicking on squares
+                        square.addEventListener('click', handleSquareClick);
+                        
+                        chessboardElement.appendChild(square);
+                    }
+                }
+            }
+            
+            // Update the chessboard based on the current game state
+            function updateBoard() {
+                if (!gameState.board) return;
+                
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const actualRow = perspective === 'white' ? 7 - row : row;
+                        const actualCol = perspective === 'white' ? col : 7 - col;
+                        
+                        const square = document.querySelector(`.square[data-row="${actualRow}"][data-col="${actualCol}"]`);
+                        const piece = gameState.board[actualRow][actualCol];
+                        
+                        // Clear the square
+                        square.textContent = '';
+                        
+                        // Add piece if there is one
+                        if (piece) {
+                            square.textContent = pieces[piece.color][piece.type];
+                        }
+                    }
+                }
+                
+                // Update status message
+                if (gameState.checkmate) {
+                    statusElement.textContent = `${gameState.currentPlayer === 'white' ? 'Black' : 'White'} wins by checkmate!`;
+                } else if (gameState.stalemate) {
+                    statusElement.textContent = 'Stalemate! Game ends in a draw.';
+                } else if (gameState.check) {
+                    statusElement.textContent = `${gameState.currentPlayer} is in check. ${gameState.currentPlayer} to move.`;
+                } else {
+                    statusElement.textContent = `${gameState.currentPlayer} to move`;
+                }
+            }
+            
+            // Handle clicking on a square
+            function handleSquareClick(event) {
+                const square = event.target;
+                const row = parseInt(square.dataset.row);
+                const col = parseInt(square.dataset.col);
+                
+                // If no square is selected, select this one if it has a piece of the current player
+                if (!selectedSquare) {
+                    const piece = gameState.board[row][col];
+                    if (piece && piece.color === gameState.currentPlayer) {
+                        selectedSquare = { row, col };
+                        square.classList.add('selected');
+                        
+                        // Get valid moves from the server
+                        getValidMoves(row, col);
+                    }
+                } else {
+                    // If a square is already selected, try to move the piece
+                    const fromRow = selectedSquare.row;
+                    const fromCol = selectedSquare.col;
+                    
+                    // Check if the clicked square is a valid move
+                    const isValidMove = validMoves.some(move => 
+                        move.row === row && move.col === col
+                    );
+                    
+                    if (isValidMove) {
+                        // Check if this is a pawn promotion move
+                        const piece = gameState.board[fromRow][fromCol];
+                        const isPromotionMove = piece.type === 'pawn' && 
+                            ((piece.color === 'white' && row === 7) || 
+                             (piece.color === 'black' && row === 0));
+                        
+                        if (isPromotionMove) {
+                            // Show the promotion modal
+                            promotionModal.style.display = 'flex';
+                            promotionCallback = (promotionPiece) => {
+                                makeMove(fromRow, fromCol, row, col, promotionPiece);
+                            };
+                        } else {
+                            // Make the move
+                            makeMove(fromRow, fromCol, row, col);
+                        }
+                    }
+                    
+                    // Deselect the square and clear valid moves
+                    clearSelection();
+                }
+            }
+            
+            // Get valid moves from the server
+            function getValidMoves(row, col) {
+                fetch(`${API_URL}/valid_moves?row=${row}&col=${col}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        validMoves = data.moves;
+                        
+                        // Highlight valid moves on the board
+                        validMoves.forEach(move => {
+                            const square = document.querySelector(`.square[data-row="${move.row}"][data-col="${move.col}"]`);
+                            if (gameState.board[move.row][move.col]) {
+                                square.classList.add('valid-capture');
+                            } else {
+                                square.classList.add('valid-move');
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error getting valid moves:', error);
+                    });
+            }
+            
+            // Make a move
+            function makeMove(fromRow, fromCol, toRow, toCol, promotionPiece = null) {
+                const moveData = {
+                    from_row: fromRow,
+                    from_col: fromCol,
+                    to_row: toRow,
+                    to_col: toCol,
+                    promotion: promotionPiece
+                };
+                
+                fetch(`${API_URL}/move`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(moveData)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // The server will update all clients via WebSocket
+                        } else {
+                            console.error('Invalid move:', data.message);
+                            statusElement.textContent = `Invalid move: ${data.message}`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error making move:', error);
+                    });
+            }
+            
+            // Update the game state from WebSocket or API response
+            function updateGameState(newState) {
+                gameState = newState;
+                updateBoard();
+            }
+            
+            // Clear the current selection and valid moves highlighting
+            function clearSelection() {
+                selectedSquare = null;
+                
+                // Remove selection and valid move highlighting
+                document.querySelectorAll('.square.selected').forEach(square => {
+                    square.classList.remove('selected');
+                });
+                
+                document.querySelectorAll('.square.valid-move').forEach(square => {
+                    square.classList.remove('valid-move');
+                });
+                
+                document.querySelectorAll('.square.valid-capture').forEach(square => {
+                    square.classList.remove('valid-capture');
+                });
+                
+                validMoves = [];
+            }
+            
+            // Start a new game
+            function startNewGame() {
+                fetch(`${API_URL}/new_game`, {
+                    method: 'POST'
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // The server will update all clients via WebSocket
+                            clearSelection();
+                        } else {
+                            console.error('Failed to start new game:', data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error starting new game:', error);
+                    });
+            }
+            
+            // Switch the board perspective
+            function switchPerspective() {
+                perspective = perspective === 'white' ? 'black' : 'white';
+                initChessboard();
+                updateBoard();
+            }
+            
+            // Handle promotion piece selection
+            function handlePromotionSelection(event) {
+                const piece = event.target.dataset.piece;
+                promotionModal.style.display = 'none';
+                
+                if (promotionCallback) {
+                    promotionCallback(piece);
+                    promotionCallback = null;
+                }
+            }
+            
+            // Fetch the initial game state
+            function fetchGameState() {
+                fetch(`${API_URL}/game_state`)
+                    .then(response => response.json())
+                    .then(data => {
+                        updateGameState(data);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching game state:', error);
+                    });
+            }
+            
+            // Event listeners
+            newGameButton.addEventListener('click', startNewGame);
+            switchPerspectiveButton.addEventListener('click', switchPerspective);
+            
+            promotionOptions.forEach(option => {
+                option.addEventListener('click', handlePromotionSelection);
+            });
+            
+            // Initialize the game
+            initChessboard();
+            initWebSocket();
+            fetchGameState();
+        });
+    </script>
+</body>
+</html>
