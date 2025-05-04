@@ -1,1330 +1,629 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess BCI Game</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-        }
-        
-        .game-container {
-            display: flex;
-            flex-direction: row;
-            align-items: flex-start;
-            gap: 20px;
-        }
-        
-        .chess-navigation {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .top-row, .bottom-row {
-            display: flex;
-            justify-content: center;
-            margin: 10px 0;
-        }
-        
-        .middle-row {
-            display: flex;
-            align-items: center;
-        }
-        
-        .board-container {
-            margin: 0 10px;
-        }
-        
-        .controls-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            width: 300px;
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        
-        .chessboard {
-            display: grid;
-            grid-template-columns: repeat(8, 60px);
-            grid-template-rows: repeat(8, 60px);
-            border: 2px solid #333;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .action-button {
-            padding: 12px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 18px;
-            font-weight: bold;
-            transition: background-color 0.3s;
-            flex: 1;
-        }
-        
-        .action-button:hover {
-            background-color: #45a049;
-        }
-        
-        .action-button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        
-        .action-button.deselect {
-            background-color: #f44336;
-        }
-        
-        .action-button.deselect:hover {
-            background-color: #d32f2f;
-        }
-        
-        .move-button {
-            background-color: #2196F3;
-        }
-        
-        .move-button:hover {
-            background-color: #0b7dda;
-        }
-        
-        .square {
-            width: 60px;
-            height: 60px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 40px;
-            cursor: pointer;
-            position: relative;
-        }
-        
-        .white {
-            background-color: #f0d9b5;
-        }
-        
-        .black {
-            background-color: #b58863;
-        }
-        
-        .square.selected {
-            background-color: #7389AE;
-        }
-        
-        .piece {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: opacity 0.3s ease;
-        }
-        
-        .piece-inactive {
-            opacity: 0.4;
-        }
-        
-        .piece-selected {
-            position: relative;
-        }
-        
-        .piece-selected::after {
-            content: "";
-            position: absolute;
-            width: 54px;
-            height: 54px;
-            border: 3px solid #4CAF50;
-            border-radius: 50%;
-            pointer-events: none;
-        }
-        
-        .square.valid-move {
-            position: relative;
-        }
-        
-        .square.valid-move::after {
-            content: "";
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background-color: rgba(0, 0, 0, 0.2);
-            border-radius: 50%;
-        }
-        
-        .square.valid-capture::after {
-            content: "";
-            position: absolute;
-            width: 54px;
-            height: 54px;
-            border: 3px solid rgba(0, 0, 0, 0.2);
-            border-radius: 50%;
-        }
-        
-        .square.selected-move::after {
-            content: "";
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            background-color: rgba(76, 175, 80, 0.6);
-            border-radius: 50%;
-            z-index: 2;
-        }
-        
-        .square.selected-capture::after {
-            content: "";
-            position: absolute;
-            width: 54px;
-            height: 54px;
-            border: 3px solid rgba(76, 175, 80, 0.8);
-            border-radius: 50%;
-            z-index: 2;
-        }
-        
-        .nav-button {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background-color: #4CAF50;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 0;
-            margin: 5px;
-            transition: all 0.3s ease;
-        }
-        
-        .nav-button:hover {
-            background-color: #45a049;
-            transform: scale(1.05);
-        }
-        
-        .nav-button:active {
-            transform: scale(0.95);
-        }
-        
-        .nav-button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        
-        .nav-button svg {
-            width: 30px;
-            height: 30px;
-        }
-        
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        
-        button {
-            padding: 8px 16px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        
-        button:hover {
-            background-color: #45a049;
-        }
-        
-        .connection-status {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        
-        .connected {
-            background-color: #4CAF50;
-            color: white;
-        }
-        
-        .disconnected {
-            background-color: #f44336;
-            color: white;
-        }
-        
-        .promotion-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        
-        .promotion-options {
-            display: flex;
-            flex-direction: column;
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            gap: 10px;
-        }
-        
-        .promotion-option {
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            cursor: pointer;
-            text-align: center;
-            font-size: 24px;
-        }
-        
-        .promotion-option:hover {
-            background-color: #f0f0f0;
-        }
-    </style>
-</head>
-<body>
-    <h1>Chess BCI Game</h1>
-    
-    <div class="game-container">
-        <div class="chess-navigation">
-            <div class="top-row">
-                <button class="nav-button" id="nav-up">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-                        <path d="M12 4l-8 8h16z" fill="#fff"/>
-                    </svg>
-                </button>
-            </div>
-            
-            <div class="middle-row">
-                <button class="nav-button" id="nav-left">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-                        <path d="M4 12l8 8V4z" fill="#fff"/>
-                    </svg>
-                </button>
-                
-                <div class="board-container">
-                    <div class="chessboard" id="chessboard"></div>
-                </div>
-                
-                <button class="nav-button" id="nav-right">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-                        <path d="M20 12l-8-8v16z" fill="#fff"/>
-                    </svg>
-                </button>
-            </div>
-            
-            <div class="bottom-row">
-                <button class="nav-button" id="nav-down">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-                        <path d="M12 20l8-8H4z" fill="#fff"/>
-                    </svg>
-                </button>
-            </div>
+document.addEventListener('DOMContentLoaded', () => {
+    const pieces = {
+      wP: '♙', wR: '♖', wN: '♘', wB: '♗', wQ: '♕', wK: '♔',
+      bP: '♟', bR: '♜', bN: '♞', bB: '♝', bQ: '♛', bK: '♚',
+      empty: ''
+    };
+  
+    const initialBoard = [
+      ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
+      ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'],
+      ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+      ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+      ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+      ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+      ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'],
+      ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
+    ];
+  
+    let board = JSON.parse(JSON.stringify(initialBoard));
+    let currentPlayer = 'w';
+    let selectedSquare = null;
+    let cursorPos = { row: 7, col: 0 };
+    let validMoves = [];
+    let arrowPressed = null;
+    let castlingRights = {
+      w: { kingSide: true, queenSide: true },
+      b: { kingSide: true, queenSide: true }
+    };
+    let kingPositions = {
+      w: { row: 7, col: 4 },
+      b: { row: 0, col: 4 }
+    };
+    let promotionSquare = null;
+  
+    function createGameUI() {
+      const gameContainer = document.createElement('div');
+      gameContainer.id = 'chess-game';
+      gameContainer.style.display = 'flex';
+      gameContainer.style.flexDirection = 'column';
+      gameContainer.style.alignItems = 'center';
+      document.body.appendChild(gameContainer);
+  
+      const turnDisplay = document.createElement('div');
+      turnDisplay.id = 'turn-display';
+      turnDisplay.style.marginBottom = '16px';
+      turnDisplay.style.fontSize = '24px';
+      turnDisplay.style.fontWeight = 'bold';
+      gameContainer.appendChild(turnDisplay);
+  
+      const arrowContainer = document.createElement('div');
+      arrowContainer.id = 'arrow-container';
+      arrowContainer.style.display = 'grid';
+      arrowContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+      arrowContainer.style.marginBottom = '8px';
+      arrowContainer.style.width = '240px';
+      arrowContainer.style.height = '80px';
+      gameContainer.appendChild(arrowContainer);
+  
+      createArrowButtons(arrowContainer);
+  
+      const boardContainer = document.createElement('div');
+      boardContainer.id = 'board-container';
+      boardContainer.style.border = '4px solid #5D4037';
+      boardContainer.style.width = '384px';
+      boardContainer.style.height = '384px';
+      gameContainer.appendChild(boardContainer);
+  
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.marginTop = '16px';
+      buttonContainer.style.display = 'flex';
+      buttonContainer.style.gap = '16px';
+      gameContainer.appendChild(buttonContainer);
+  
+      const newGameBtn = document.createElement('button');
+      newGameBtn.textContent = 'New Game';
+      newGameBtn.style.padding = '8px 16px';
+      newGameBtn.style.backgroundColor = '#2196F3';
+      newGameBtn.style.color = 'white';
+      newGameBtn.style.border = 'none';
+      newGameBtn.style.borderRadius = '4px';
+      newGameBtn.style.cursor = 'pointer';
+      newGameBtn.onclick = newGame;
+      buttonContainer.appendChild(newGameBtn);
+  
+      const switchSidesBtn = document.createElement('button');
+      switchSidesBtn.textContent = 'Switch Sides';
+      switchSidesBtn.style.padding = '8px 16px';
+      switchSidesBtn.style.backgroundColor = '#4CAF50';
+      switchSidesBtn.style.color = 'white';
+      switchSidesBtn.style.border = 'none';
+      switchSidesBtn.style.borderRadius = '4px';
+      switchSidesBtn.style.cursor = 'pointer';
+      switchSidesBtn.onclick = switchSides;
+      buttonContainer.appendChild(switchSidesBtn);
+  
+      createPromotionDialog(gameContainer);
+      renderBoard();
+      updateTurnDisplay();
+    }
+  
+    function createArrowButtons(container) {
+      const upArrow = document.createElement('div');
+      upArrow.id = 'up-arrow';
+      upArrow.style.gridColumnStart = '2';
+      upArrow.style.display = 'flex';
+      upArrow.style.justifyContent = 'center';
+      upArrow.innerHTML = `
+        <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #9E9E9E; border-radius: 4px; background-color: #F5F5F5;">
+          ↑
         </div>
-        
-        <div class="controls-panel">
-            <div class="status" id="status">White to move</div>
-            
-            <div class="action-buttons">
-                <button class="action-button" id="nav-select">Select</button>
-                <button class="action-button move-button" id="nav-move" disabled>Move</button>
-            </div>
-            
-            <div class="controls">
-                <button id="new-game">New Game</button>
-                <button id="switch-perspective">Switch Perspective</button>
-            </div>
+      `;
+      container.appendChild(upArrow);
+  
+      const arrowRow = document.createElement('div');
+      arrowRow.style.gridColumnStart = '1';
+      arrowRow.style.gridColumnEnd = '4';
+      arrowRow.style.gridRowStart = '2';
+      arrowRow.style.display = 'grid';
+      arrowRow.style.gridTemplateColumns = 'repeat(3, 1fr)';
+      container.appendChild(arrowRow);
+  
+      const leftArrow = document.createElement('div');
+      leftArrow.id = 'left-arrow';
+      leftArrow.innerHTML = `
+        <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #9E9E9E; border-radius: 4px; background-color: #F5F5F5;">
+          ←
         </div>
-    </div>
-    
-    <div class="connection-status disconnected" id="connection-status">Disconnected</div>
-    
-    <div class="promotion-modal" id="promotion-modal">
-        <div class="promotion-options">
-            <h3>Promote pawn to:</h3>
-            <div class="promotion-option" data-piece="queen">♛</div>
-            <div class="promotion-option" data-piece="rook">♜</div>
-            <div class="promotion-option" data-piece="bishop">♝</div>
-            <div class="promotion-option" data-piece="knight">♞</div>
+      `;
+      arrowRow.appendChild(leftArrow);
+  
+      const downArrow = document.createElement('div');
+      downArrow.id = 'down-arrow';
+      downArrow.innerHTML = `
+        <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #9E9E9E; border-radius: 4px; background-color: #F5F5F5;">
+          ↓
         </div>
-    </div>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("DOM Content Loaded");
-            
-            // Constants and variables
-            const API_URL = window.location.origin;
-            const WS_URL = (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host;
-            
-            let socket = null;
-            let bciSocket = null;
-            let selectedSquare = null;
-            let validMoves = [];
-            let gameState = {
-                board: null,
-                currentPlayer: 'white',
-                castlingRights: {
-                    white: { kingSide: true, queenSide: true },
-                    black: { kingSide: true, queenSide: true }
-                },
-                check: false,
-                checkmate: false,
-                stalemate: false
-            };
-            let perspective = 'white'; // Default perspective
-            let promotionCallback = null;
-            
-            // BCI variables
-            let bciConnected = false;
-            let bciMode = false;
-            let currentFocus = null;
-            let bciHighlightIndex = 0;
-            let bciHighlightInterval = null;
-            let bciElements = [];
-            let lastBciData = null;
-            let selectionState = 'none'; // 'none', 'selecting-piece', 'selecting-destination'
-            let selectedPiece = null;
-            
-            // Navigation variables
-            let navigationActive = false;
-            let navCurrentRow = 0;
-            let navCurrentCol = 0;
-            let navSelectionMode = false;  // false = selecting piece, true = selecting destination
-            let navSelectedPiece = null;
-            let selectedPieceType = null;  // Store the type of the selected piece
-            let selectedPieceColor = null; // Store the color of the selected piece
-            let currentMoveIndex = -1;     // Index of currently selected move
-            let selectedMoveRow = -1;      // Row of the currently selected move
-            let selectedMoveCol = -1;      // Column of the currently selected move
-            
-            // DOM Elements
-            const chessboardElement = document.getElementById('chessboard');
-            const statusElement = document.getElementById('status');
-            const newGameButton = document.getElementById('new-game');
-            const switchPerspectiveButton = document.getElementById('switch-perspective');
-            const connectionStatusElement = document.getElementById('connection-status');
-            const promotionModal = document.getElementById('promotion-modal');
-            const promotionOptions = document.querySelectorAll('.promotion-option');
-            
-            // Chess piece Unicode characters
-            const pieces = {
-                white: {
-                    pawn: '♙',
-                    rook: '♖',
-                    knight: '♘',
-                    bishop: '♗',
-                    queen: '♕',
-                    king: '♔'
-                },
-                black: {
-                    pawn: '♟',
-                    rook: '♜',
-                    knight: '♞',
-                    bishop: '♝',
-                    queen: '♛',
-                    king: '♚'
-                }
-            };
-            
-            // Initialize WebSocket connection
-            function initWebSocket() {
-                socket = new WebSocket(`${WS_URL}/ws`);
-                
-                socket.onopen = () => {
-                    connectionStatusElement.textContent = 'Connected';
-                    connectionStatusElement.classList.add('connected');
-                    connectionStatusElement.classList.remove('disconnected');
-                    console.log('WebSocket connection established');
-                };
-                
-                socket.onclose = () => {
-                    connectionStatusElement.textContent = 'Disconnected';
-                    connectionStatusElement.classList.add('disconnected');
-                    connectionStatusElement.classList.remove('connected');
-                    console.log('WebSocket connection closed');
-                    
-                    // Try to reconnect after a delay
-                    setTimeout(initWebSocket, 5000);
-                };
-                
-                socket.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                };
-                
-                socket.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    console.log('WebSocket message received:', data);
-                    
-                    if (data.type === 'game_state') {
-                        updateGameState(data.state);
-                    }
-                };
-            }
-            
-            // Initialize the chessboard
-            function initChessboard() {
-                console.log("Initializing chessboard");
-                chessboardElement.innerHTML = '';
-                
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
-                        const square = document.createElement('div');
-                        square.className = 'square';
-                        
-                        // Determine if the square is white or black
-                        if ((row + col) % 2 === 0) {
-                            square.classList.add('white');
-                        } else {
-                            square.classList.add('black');
-                        }
-                        
-                        // Set data attributes for position
-                        const actualRow = perspective === 'white' ? 7 - row : row;
-                        const actualCol = perspective === 'white' ? col : 7 - col;
-                        
-                        square.dataset.row = actualRow;
-                        square.dataset.col = actualCol;
-                        
-                        // Add event listener for clicking on squares
-                        square.addEventListener('click', handleSquareClick);
-                        
-                        chessboardElement.appendChild(square);
-                    }
-                }
-                
-                // Update the board with pieces
-                updateBoard();
-            }
-            
-            // Update the chessboard based on the current game state
-            function updateBoard() {
-                if (!gameState.board) {
-                    console.log("No game state board available yet");
-                    return;
-                }
-                
-                console.log("Updating board. Current position:", navCurrentRow, navCurrentCol);
-                console.log("Selection mode:", navSelectionMode);
-                console.log("Selected piece:", navSelectedPiece);
-                
-                // First, clear all valid move indicators
-                document.querySelectorAll('.square').forEach(square => {
-                    square.classList.remove('valid-move');
-                    square.classList.remove('valid-capture');
-                });
-                
-                // If we have selected a piece, highlight valid moves
-                if (navSelectionMode && validMoves.length > 0) {
-                    validMoves.forEach(move => {
-                        const square = document.querySelector(`.square[data-row="${move.row}"][data-col="${move.col}"]`);
-                        if (!square) return;
-                        
-                        if (gameState.board[move.row][move.col]) {
-                            square.classList.add('valid-capture');
-                        } else {
-                            square.classList.add('valid-move');
-                        }
-                    });
-                }
-                
-                // Now update all squares with pieces
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
-                        const actualRow = perspective === 'white' ? 7 - row : row;
-                        const actualCol = perspective === 'white' ? col : 7 - col;
-                        
-                        const square = document.querySelector(`.square[data-row="${actualRow}"][data-col="${actualCol}"]`);
-                        if (!square) {
-                            console.log("Square not found:", actualRow, actualCol);
-                            continue;
-                        }
-                        
-                        const piece = gameState.board[actualRow][actualCol];
-                        
-                        // Clear the square
-                        square.innerHTML = '';
-                        
-                        // Add piece if there is one
-                        if (piece) {
-                            const pieceElement = document.createElement('div');
-                            pieceElement.className = 'piece';
-                            pieceElement.textContent = pieces[piece.color][piece.type];
-                            
-                            // Add data attributes for easier selection
-                            pieceElement.dataset.row = actualRow;
-                            pieceElement.dataset.col = actualCol;
-                            
-                            // If navigation is active, handle piece styling
-                            if (navigationActive) {
-                                // If we're in selection mode and this is not the selected piece, dim it
-                                if (navSelectionMode && navSelectedPiece) {
-                                    // If it's not the selected piece, dim it
-                                    if (!(actualRow === navSelectedPiece.row && actualCol === navSelectedPiece.col)) {
-                                        pieceElement.classList.add('piece-inactive');
-                                    } else {
-                                        // This is the selected piece, add selected class
-                                        pieceElement.classList.add('piece-selected');
-                                    }
-                                }
-                                
-                                // If this is the current position in navigation, add highlighting
-                                if (actualRow === navCurrentRow && actualCol === navCurrentCol) {
-                                    pieceElement.classList.add('piece-selected');
-                                }
-                            }
-                            
-                            square.appendChild(pieceElement);
-                        }
-                    }
-                }
-                
-                // Update status message
-                if (gameState.checkmate) {
-                    statusElement.textContent = `${gameState.currentPlayer === 'white' ? 'Black' : 'White'} wins by checkmate!`;
-                } else if (gameState.stalemate) {
-                    statusElement.textContent = 'Stalemate! Game ends in a draw.';
-                } else if (gameState.check) {
-                    statusElement.textContent = `${gameState.currentPlayer} is in check. ${gameState.currentPlayer} to move.`;
-                } else {
-                    statusElement.textContent = `${gameState.currentPlayer} to move`;
-                }
-                
-                // Update select button text based on selection state
-                const selectButton = document.getElementById('nav-select');
-                if (navSelectionMode) {
-                    selectButton.textContent = "Deselect";
-                    selectButton.classList.add("deselect");
-                } else {
-                    selectButton.textContent = "Select";
-                    selectButton.classList.remove("deselect");
-                }
-            }
-            
-            // Handle clicking on a square
-            function handleSquareClick(event) {
-                // If in BCI mode, ignore manual clicks
-                if (bciMode) return;
-                
-                const square = event.target;
-                const row = parseInt(square.dataset.row);
-                const col = parseInt(square.dataset.col);
-                
-                // If no square is selected, select this one if it has a piece of the current player
-                if (!selectedSquare) {
-                    const piece = gameState.board[row][col];
-                    if (piece && piece.color === gameState.currentPlayer) {
-                        selectedSquare = { row, col };
-                        square.classList.add('selected');
-                        
-                        // Get valid moves from the server
-                        getValidMoves(row, col);
-                    }
-                } else {
-                    // If a square is already selected, try to move the piece
-                    const fromRow = selectedSquare.row;
-                    const fromCol = selectedSquare.col;
-                    
-                    // Check if the clicked square is a valid move
-                    const isValidMove = validMoves.some(move => 
-                        move.row === row && move.col === col
-                    );
-                    
-                    if (isValidMove) {
-                        // Check if this is a pawn promotion move
-                        const piece = gameState.board[fromRow][fromCol];
-                        const isPromotionMove = piece.type === 'pawn' && 
-                            ((piece.color === 'white' && row === 7) || 
-                             (piece.color === 'black' && row === 0));
-                        
-                        if (isPromotionMove) {
-                            // Show the promotion modal
-                            promotionModal.style.display = 'flex';
-                            promotionCallback = (promotionPiece) => {
-                                makeMove(fromRow, fromCol, row, col, promotionPiece);
-                            };
-                        } else {
-                            // Make the move
-                            makeMove(fromRow, fromCol, row, col);
-                        }
-                    }
-                    
-                    // Deselect the square and clear valid moves
-                    clearSelection();
-                }
-            }
-            
-            // Get valid moves from the server
-            function getValidMoves(row, col) {
-                console.log("Getting valid moves for position:", row, col);
-                
-                return fetch(`${API_URL}/valid_moves?row=${row}&col=${col}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        validMoves = data.moves;
-                        console.log("Valid moves:", validMoves);
-                        
-                        // Highlight valid moves on the board
-                        validMoves.forEach(move => {
-                            const square = document.querySelector(`.square[data-row="${move.row}"][data-col="${move.col}"]`);
-                            if (!square) return;
-                            
-                            if (gameState.board[move.row][move.col]) {
-                                square.classList.add('valid-capture');
-                            } else {
-                                square.classList.add('valid-move');
-                            }
-                        });
-                        
-                        updateBoard();
-                        return validMoves;
-                    })
-                    .catch(error => {
-                        console.error('Error getting valid moves:', error);
-                        return [];
-                    });
-            }
-            
-            // Make a move
-            function makeMove(fromRow, fromCol, toRow, toCol, promotionPiece = null) {
-                const moveData = {
-                    from_row: fromRow,
-                    from_col: fromCol,
-                    to_row: toRow,
-                    to_col: toCol,
-                    promotion: promotionPiece
-                };
-                
-                console.log("Making move:", moveData);
-                
-                fetch(`${API_URL}/move`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(moveData)
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (!data.success) {
-                            console.error('Invalid move:', data.message);
-                            statusElement.textContent = `Invalid move: ${data.message}`;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error making move:', error);
-                    });
-            }
-            
-            // Update the game state from WebSocket or API response
-            function updateGameState(newState) {
-                console.log("Updating game state:", newState);
-                gameState = newState;
-                updateBoard();
-            }
-            
-            // Clear the current selection and valid moves highlighting
-            function clearSelection() {
-                selectedSquare = null;
-                currentMoveIndex = -1;
-                selectedMoveRow = -1;
-                selectedMoveCol = -1;
-                
-                // Remove selection and valid move highlighting
-                document.querySelectorAll('.square.selected').forEach(square => {
-                    square.classList.remove('selected');
-                });
-                
-                document.querySelectorAll('.square.valid-move').forEach(square => {
-                    square.classList.remove('valid-move');
-                });
-                
-                document.querySelectorAll('.square.valid-capture').forEach(square => {
-                    square.classList.remove('valid-capture');
-                });
-                
-                document.querySelectorAll('.square.selected-move').forEach(square => {
-                    square.classList.remove('selected-move');
-                });
-                
-                document.querySelectorAll('.square.selected-capture').forEach(square => {
-                    square.classList.remove('selected-capture');
-                });
-                
-                validMoves = [];
-                
-                // Disable move button
-                const moveButton = document.getElementById('nav-move');
-                if (moveButton) moveButton.disabled = true;
-            }
-            
-            // Start a new game
-            function startNewGame() {
-                fetch(`${API_URL}/new_game`, {
-                    method: 'POST'
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            // The server will update all clients via WebSocket
-                            clearSelection();
-                            
-                            // Reset BCI state
-                            selectionState = 'none';
-                            selectedPiece = null;
-                            
-                            // Reset navigation state
-                            navSelectionMode = false;
-                            navSelectedPiece = null;
-                            selectedPieceType = null;
-                            selectedPieceColor = null;
-                            currentMoveIndex = -1;
-                            selectedMoveRow = -1;
-                            selectedMoveCol = -1;
-                            
-                            // Find the first piece again after reset
-                            findFirstPiecePosition();
-                        } else {
-                            console.error('Failed to start new game:', data.message);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error starting new game:', error);
-                    });
-            }
-            
-            // Switch the board perspective
-            function switchPerspective() {
-                perspective = perspective === 'white' ? 'black' : 'white';
-                initChessboard();
-                updateBoard();
-            }
-            
-            // Handle promotion piece selection
-            function handlePromotionSelection(event) {
-                const piece = event.target.dataset.piece;
-                promotionModal.style.display = 'none';
-                
-                if (promotionCallback) {
-                    promotionCallback(piece);
-                    promotionCallback = null;
-                }
-            }
-            
-            // Arrow navigation functions
-            
-            // Initialize navigation
-            function initNavigation() {
-                navigationActive = true;
-                navSelectionMode = false;
-                navSelectedPiece = null;
-                
-                // Find the first piece of the current player
-                findFirstPiecePosition();
-                
-                console.log("Navigation initialized, current position:", navCurrentRow, navCurrentCol);
-            }
-            
-            // Find the first piece of the current player
-            function findFirstPiecePosition() {
-                if (!gameState.board) {
-                    console.log("No game state board available for finding first piece");
-                    return;
-                }
-                
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
-                        const piece = gameState.board[row][col];
-                        if (piece && piece.color === gameState.currentPlayer) {
-                            navCurrentRow = row;
-                            navCurrentCol = col;
-                            console.log("Found first piece at:", row, col);
-                            return;
-                        }
-                    }
-                }
-            }
-            
-            // Handle navigation up button
-            function handleNavUp() {
-                if (!navigationActive) return;
-                
-                console.log("Up button pressed");
-                
-                if (navSelectionMode && validMoves.length > 0) {
-                    // When a piece is selected, use arrow keys to cycle through valid moves
-                    prevValidMove();
-                } else {
-                    // Normal navigation mode - need to account for board perspective
-                    // In chess, rank 1 (white's side) is at the bottom, rank 8 is at the top
-                    // So "up" should decrease row number if perspective is black, increase if white
-                    let nextRow;
-                    if (perspective === 'white') {
-                        nextRow = navCurrentRow - 1; // Move up the board toward black's side
-                    } else {
-                        nextRow = navCurrentRow + 1; // Move up the board toward white's side
-                    }
-                    
-                    // Wrap around if at the edge
-                    if (nextRow < 0) nextRow = 7;
-                    if (nextRow > 7) nextRow = 0;
-                    
-                    navCurrentRow = nextRow;
-                    console.log("New position:", navCurrentRow, navCurrentCol);
-                    updateBoard();
-                }
-            }
-            
-            // Handle navigation down button
-            function handleNavDown() {
-                if (!navigationActive) return;
-    
-                console.log("Down button pressed");
-                
-                if (navSelectionMode && validMoves.length > 0) {
-                    // When a piece is selected, use arrow keys to cycle through valid moves
-                    nextValidMove();
-                } else {
-                    // Normal navigation mode - account for perspective
-                    let nextRow;
-                    if (perspective === 'white') {
-                        nextRow = navCurrentRow + 1; // Move down the board toward white's side
-                    } else {
-                        nextRow = navCurrentRow - 1; // Move down the board toward black's side
-                    }
-                    
-                    // Wrap around if at the edge
-                    if (nextRow < 0) nextRow = 7;
-                    if (nextRow > 7) nextRow = 0;
-                    
-                    navCurrentRow = nextRow;
-                    console.log("New position:", navCurrentRow, navCurrentCol);
-                    updateBoard();
-                }
-            }
-            
-            // Handle navigation left button
-            function handleNavLeft() {
-                if (!navigationActive) return;
-                
-                console.log("Left button pressed");
-                
-                if (navSelectionMode) {
-                    // When a piece is selected, use arrow keys to cycle through valid moves
-                    prevValidMove();
-                } else {
-                    // Normal navigation mode
-                    let nextCol = navCurrentCol - 1;
-                    
-                    // Wrap around if at the edge
-                    if (nextCol < 0) nextCol = 7;
-                    
-                    navCurrentCol = nextCol;
-                    console.log("New position:", navCurrentRow, navCurrentCol);
-                    updateBoard();
-                }
-            }
-            
-            // Handle navigation right button
-            function handleNavRight() {
-                if (!navigationActive) return;
-                
-                console.log("Right button pressed");
-                
-                if (navSelectionMode) {
-                    // When a piece is selected, use arrow keys to cycle through valid moves
-                    nextValidMove();
-                } else {
-                    // Normal navigation mode
-                    let nextCol = navCurrentCol + 1;
-                    
-                    // Wrap around if at the edge
-                    if (nextCol > 7) nextCol = 0;
-                    
-                    navCurrentCol = nextCol;
-                    console.log("New position:", navCurrentRow, navCurrentCol);
-                    updateBoard();
-                }
-            }
-            
-            // Reset all arrows to visible
-            function resetArrowVisibility() {
-                const upButton = document.getElementById('nav-up');
-                const downButton = document.getElementById('nav-down');
-                const leftButton = document.getElementById('nav-left');
-                const rightButton = document.getElementById('nav-right');
-                
-                upButton.disabled = false;
-                downButton.disabled = false;
-                leftButton.disabled = false;
-                rightButton.disabled = false;
-            }
-            
-            // Handle navigation select button
-            function handleNavSelect() {
-                if (!navigationActive) return;
-                
-                console.log("Select button pressed, current position:", navCurrentRow, navCurrentCol);
-                console.log("Selection mode:", navSelectionMode);
-                console.log("Selected piece:", navSelectedPiece);
-                
-                const piece = gameState.board[navCurrentRow][navCurrentCol];
-                
-                // If not in selection mode (selecting a piece)
-                if (!navSelectionMode) {
-                    // If there's a piece of the current player at the current position
-                    if (piece && piece.color === gameState.currentPlayer) {
-                        // Select the piece
-                        navSelectedPiece = { row: navCurrentRow, col: navCurrentCol };
-                        selectedPieceType = piece.type;
-                        selectedPieceColor = piece.color;
-                        navSelectionMode = true;
-                        
-                        console.log("Selected piece:", selectedPieceType, "at", navCurrentRow, navCurrentCol);
-                        
-                        // Change select button text
-                        const selectButton = document.getElementById('nav-select');
-                        selectButton.textContent = "Deselect";
-                        selectButton.classList.add("deselect");
-                        
-                        // Get valid moves for this piece
-                        getValidMoves(navCurrentRow, navCurrentCol)
-                            .then(moves => {
-                                if (moves.length > 0) {
-                                    // Set the first move as the default selection
-                                    currentMoveIndex = 0;
-                                    selectedMoveRow = moves[0].row;
-                                    selectedMoveCol = moves[0].col;
-                                    
-                                    // Move cursor to the first valid move
-                                    navCurrentRow = selectedMoveRow;
-                                    navCurrentCol = selectedMoveCol;
-                                    
-                                    // Add highlight to the first move
-                                    const firstMove = moves[0];
-                                    const firstSquare = document.querySelector(`.square[data-row="${firstMove.row}"][data-col="${firstMove.col}"]`);
-                                    if (firstSquare) {
-                                        if (gameState.board[firstMove.row][firstMove.col]) {
-                                            firstSquare.classList.add('selected-capture');
-                                        } else {
-                                            firstSquare.classList.add('selected-move');
-                                        }
-                                    }
-                                    
-                                    // Enable move button
-                                    const moveButton = document.getElementById('nav-move');
-                                    moveButton.disabled = false;
-                                    
-                                    console.log("Selected first move at:", selectedMoveRow, selectedMoveCol);
-                                    updateBoard();
-                                }
-                            });
-                    } else {
-                        console.log("No valid piece to select at current position");
-                    }
-                } else {
-                    // If already in selection mode, deselect the piece
-                    navSelectionMode = false;
-                    navSelectedPiece = null;
-                    selectedPieceType = null;
-                    selectedPieceColor = null;
-                    currentMoveIndex = -1;
-                    selectedMoveRow = -1;
-                    selectedMoveCol = -1;
-                    clearSelection();
-                    
-                    // Reset select button text
-                    const selectButton = document.getElementById('nav-select');
-                    selectButton.textContent = "Select";
-                    selectButton.classList.remove("deselect");
-                    
-                    // Disable move button
-                    const moveButton = document.getElementById('nav-move');
-                    moveButton.disabled = true;
-                    
-                    // Reset arrow visibility
-                    resetArrowVisibility();
-                    
-                    // Move cursor back to the piece
-                    if (navSelectedPiece) {
-                        navCurrentRow = navSelectedPiece.row;
-                        navCurrentCol = navSelectedPiece.col;
-                    }
-                }
-                
-                updateBoard();
-            }
-            
-            // Handle move button
-            function handleMove() {
-                if (!navigationActive || !navSelectionMode || currentMoveIndex === -1) return;
-                
-                console.log("Move button pressed");
-                
-                // Check if there's a valid move selected
-                if (currentMoveIndex >= 0 && currentMoveIndex < validMoves.length) {
-                    const move = validMoves[currentMoveIndex];
-                    const fromRow = navSelectedPiece.row;
-                    const fromCol = navSelectedPiece.col;
-                    const toRow = move.row;
-                    const toCol = move.col;
-                    
-                    // Check if this is a pawn promotion move
-                    const piece = gameState.board[fromRow][fromCol];
-                    const isPromotionMove = piece.type === 'pawn' && 
-                        ((piece.color === 'white' && toRow === 7) || 
-                         (piece.color === 'black' && toRow === 0));
-                    
-                    if (isPromotionMove) {
-                        // Show the promotion modal
-                        promotionModal.style.display = 'flex';
-                        promotionCallback = (promotionPiece) => {
-                            makeMove(fromRow, fromCol, toRow, toCol, promotionPiece);
-                        };
-                    } else {
-                        // Make the move
-                        makeMove(fromRow, fromCol, toRow, toCol);
-                    }
-                    
-                    // Reset selection state
-                    navSelectionMode = false;
-                    navSelectedPiece = null;
-                    selectedPieceType = null;
-                    selectedPieceColor = null;
-                    currentMoveIndex = -1;
-                    selectedMoveRow = -1;
-                    selectedMoveCol = -1;
-                    clearSelection();
-                    
-                    // Reset select button text
-                    const selectButton = document.getElementById('nav-select');
-                    selectButton.textContent = "Select";
-                    selectButton.classList.remove("deselect");
-                    
-                    // Disable move button
-                    const moveButton = document.getElementById('nav-move');
-                    moveButton.disabled = true;
-                    
-                    updateBoard();
-                }
-            }
-            
-            // Cycle to the next valid move
-            function nextValidMove() {
-                if (!navSelectionMode || validMoves.length === 0) {
-                    console.log("Cannot cycle moves: not in selection mode or no valid moves");
-                    return;
-                }
-                
-                // First, remove the current selection highlight
-                if (currentMoveIndex >= 0) {
-                    const prevMove = validMoves[currentMoveIndex];
-                    const prevSquare = document.querySelector(`.square[data-row="${prevMove.row}"][data-col="${prevMove.col}"]`);
-                    if (prevSquare) {
-                        prevSquare.classList.remove('selected-move');
-                        prevSquare.classList.remove('selected-capture');
-                    }
-                }
-                
-                // Increment the index, wrapping around if necessary
-                currentMoveIndex = (currentMoveIndex + 1) % validMoves.length;
-                
-                console.log("Moving to next valid move, index:", currentMoveIndex, "of", validMoves.length);
-                
-                // Update the selected move position
-                selectedMoveRow = validMoves[currentMoveIndex].row;
-                selectedMoveCol = validMoves[currentMoveIndex].col;
-                
-                // Move the cursor to the selected move
-                navCurrentRow = selectedMoveRow;
-                navCurrentCol = selectedMoveCol;
-                
-                // Add highlight to the current selection
-                const currentMove = validMoves[currentMoveIndex];
-                const currentSquare = document.querySelector(`.square[data-row="${currentMove.row}"][data-col="${currentMove.col}"]`);
-                if (currentSquare) {
-                    if (gameState.board[currentMove.row][currentMove.col]) {
-                        currentSquare.classList.add('selected-capture');
-                    } else {
-                        currentSquare.classList.add('selected-move');
-                    }
-                }
-                
-                // Enable move button
-                const moveButton = document.getElementById('nav-move');
-                if (moveButton) moveButton.disabled = false;
-                
-                console.log("Selected move index:", currentMoveIndex, "Position:", selectedMoveRow, selectedMoveCol);
-                
-                updateBoard();
-            }
-            
-            // Cycle to the previous valid move
-            function prevValidMove() {
-                if (!navSelectionMode || validMoves.length === 0) {
-                    console.log("Cannot cycle moves: not in selection mode or no valid moves");
-                    return;
-                }
-                
-                // Decrement the index, wrapping around if necessary
-                currentMoveIndex = (currentMoveIndex - 1 + validMoves.length) % validMoves.length;
-                
-                console.log("Moving to previous valid move, index:", currentMoveIndex, "of", validMoves.length);
-                
-                // Update the selected move position
-                selectedMoveRow = validMoves[currentMoveIndex].row;
-                selectedMoveCol = validMoves[currentMoveIndex].col;
-                
-                // Move the cursor to the selected move
-                navCurrentRow = selectedMoveRow;
-                navCurrentCol = selectedMoveCol;
-                
-                // Enable move button
-                const moveButton = document.getElementById('nav-move');
-                if (moveButton) moveButton.disabled = false;
-                
-                console.log("Selected move index:", currentMoveIndex, "Position:", selectedMoveRow, selectedMoveCol);
-                
-                updateBoard();
-}
-            
-            // Fetch the initial game state
-            function fetchGameState() {
-                console.log("Fetching initial game state");
-                fetch(`${API_URL}/game_state`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! Status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log("Received game state:", data);
-                        updateGameState(data);
-                        
-                        // Initialize navigation position to the first piece of current player
-                        if (navigationActive) {
-                            findFirstPiecePosition();
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching game state:', error);
-                    });
-            }
-            
-            // Add keyboard support for arrows and diagonal movement
-            document.addEventListener('keydown', (event) => {
-                if (!navigationActive) return;
-                
-                switch (event.key) {
-                    case 'ArrowUp':
-                    case 'ArrowLeft':
-                        if (navSelectionMode) {
-                            prevValidMove();
-                        } else {
-                            if (event.key === 'ArrowUp') handleNavUp();
-                            else handleNavLeft();
-                        }
-                        break;
-                    case 'ArrowDown':
-                    case 'ArrowRight':
-                        if (navSelectionMode) {
-                            nextValidMove();
-                        } else {
-                            if (event.key === 'ArrowDown') handleNavDown();
-                            else handleNavRight();
-                        }
-                        break;
-                    case 'Enter':
-                    case ' ': // Space bar
-                        if (navSelectionMode) {
-                            handleMove();
-                        } else {
-                            handleNavSelect();
-                        }
-                        break;
-                    case 'Escape': // Cancel selection
-                        if (navSelectionMode) {
-                            navSelectionMode = false;
-                            navSelectedPiece = null;
-                            selectedPieceType = null;
-                            selectedPieceColor = null;
-                            currentMoveIndex = -1;
-                            selectedMoveRow = -1;
-                            selectedMoveCol = -1;
-                            clearSelection();
-                            
-                            // Reset select button text
-                            const selectButton = document.getElementById('nav-select');
-                            selectButton.textContent = "Select";
-                            selectButton.classList.remove("deselect");
-                            
-                            // Disable move button
-                            const moveButton = document.getElementById('nav-move');
-                            moveButton.disabled = true;
-                            
-                            updateBoard();
-                        }
-                        break;
-                }
-            });
-            
-            // Event listeners
-            newGameButton.addEventListener('click', startNewGame);
-            switchPerspectiveButton.addEventListener('click', switchPerspective);
-            
-            promotionOptions.forEach(option => {
-                option.addEventListener('click', handlePromotionSelection);
-            });
-            
-            // Navigation button event listeners
-            document.getElementById('nav-up').addEventListener('click', handleNavUp);
-            document.getElementById('nav-down').addEventListener('click', handleNavDown);
-            document.getElementById('nav-left').addEventListener('click', handleNavLeft);
-            document.getElementById('nav-right').addEventListener('click', handleNavRight);
-            document.getElementById('nav-select').addEventListener('click', handleNavSelect);
-            document.getElementById('nav-move').addEventListener('click', handleMove);
-            
-            try {
-                // Initialize the game
-                console.log("Initializing game components");
-                initChessboard();
-                initWebSocket();
-                fetchGameState();
-                initNavigation(); // Start with navigation active
-                
-                console.log("Game initialized successfully");
-            } catch (error) {
-                console.error("Error initializing game:", error);
-            }
+      `;
+      arrowRow.appendChild(downArrow);
+  
+      const rightArrow = document.createElement('div');
+      rightArrow.id = 'right-arrow';
+      rightArrow.innerHTML = `
+        <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #9E9E9E; border-radius: 4px; background-color: #F5F5F5;">
+          →
+        </div>
+      `;
+      arrowRow.appendChild(rightArrow);
+    }
+  
+    function createPromotionDialog(container) {
+      const promotionDialog = document.createElement('div');
+      promotionDialog.id = 'promotion-dialog';
+      promotionDialog.style.position = 'absolute';
+      promotionDialog.style.top = '50%';
+      promotionDialog.style.left = '50%';
+      promotionDialog.style.transform = 'translate(-50%, -50%)';
+      promotionDialog.style.backgroundColor = 'white';
+      promotionDialog.style.padding = '16px';
+      promotionDialog.style.border = '2px solid black';
+      promotionDialog.style.borderRadius = '4px';
+      promotionDialog.style.display = 'none';
+      
+      const dialogTitle = document.createElement('div');
+      dialogTitle.textContent = 'Choose a piece for promotion';
+      dialogTitle.style.textAlign = 'center';
+      dialogTitle.style.marginBottom = '8px';
+      promotionDialog.appendChild(dialogTitle);
+  
+      const pieceContainer = document.createElement('div');
+      pieceContainer.style.display = 'flex';
+      pieceContainer.style.justifyContent = 'center';
+      pieceContainer.style.gap = '16px';
+      promotionDialog.appendChild(pieceContainer);
+  
+      const pieces = ['Q', 'R', 'B', 'N'];
+      pieces.forEach(piece => {
+        const pieceBtn = document.createElement('button');
+        pieceBtn.id = `promote-${piece}`;
+        pieceBtn.style.width = '48px';
+        pieceBtn.style.height = '48px';
+        pieceBtn.style.display = 'flex';
+        pieceBtn.style.alignItems = 'center';
+        pieceBtn.style.justifyContent = 'center';
+        pieceBtn.style.border = '1px solid #9E9E9E';
+        pieceBtn.setAttribute('data-piece', piece);
+        pieceBtn.onclick = () => handlePromotion(piece);
+        pieceContainer.appendChild(pieceBtn);
+      });
+  
+      container.appendChild(promotionDialog);
+    }
+  
+    function renderBoard() {
+      const boardContainer = document.getElementById('board-container');
+      boardContainer.innerHTML = '';
+  
+      board.forEach((row, rowIndex) => {
+        const rowEl = document.createElement('div');
+        rowEl.style.display = 'flex';
+        rowEl.style.width = '100%';
+        rowEl.style.height = '48px';
+  
+        row.forEach((piece, colIndex) => {
+          const squareEl = document.createElement('div');
+          squareEl.dataset.row = rowIndex;
+          squareEl.dataset.col = colIndex;
+          squareEl.style.display = 'flex';
+          squareEl.style.alignItems = 'center';
+          squareEl.style.justifyContent = 'center';
+          squareEl.style.width = '48px';
+          squareEl.style.height = '48px';
+          squareEl.style.position = 'relative';
+          squareEl.style.backgroundColor = (rowIndex + colIndex) % 2 === 0 ? '#FFECB3' : '#8D6E63';
+  
+          const isSelected = selectedSquare && selectedSquare.row === rowIndex && selectedSquare.col === colIndex;
+          const isCursor = cursorPos.row === rowIndex && cursorPos.col === colIndex;
+          const isValidMove = validMoves.some(move => move.row === rowIndex && move.col === colIndex);
+  
+          if (isCursor && !isSelected) {
+            const cursorIndicator = document.createElement('div');
+            cursorIndicator.style.position = 'absolute';
+            cursorIndicator.style.width = '32px';
+            cursorIndicator.style.height = '32px';
+            cursorIndicator.style.border = '2px solid #4CAF50';
+            cursorIndicator.style.borderRadius = '50%';
+            cursorIndicator.style.opacity = '0.7';
+            squareEl.appendChild(cursorIndicator);
+          }
+  
+          if (isSelected) {
+            const selectedIndicator = document.createElement('div');
+            selectedIndicator.style.position = 'absolute';
+            selectedIndicator.style.width = '100%';
+            selectedIndicator.style.height = '100%';
+            selectedIndicator.style.backgroundColor = '#81C784';
+            selectedIndicator.style.opacity = '0.3';
+            squareEl.appendChild(selectedIndicator);
+          }
+  
+          if (isValidMove) {
+            const moveIndicator = document.createElement('div');
+            moveIndicator.style.position = 'absolute';
+            moveIndicator.style.width = '32px';
+            moveIndicator.style.height = '32px';
+            moveIndicator.style.backgroundColor = '#2196F3';
+            moveIndicator.style.opacity = '0.3';
+            moveIndicator.style.borderRadius = '50%';
+            squareEl.appendChild(moveIndicator);
+          }
+  
+          const pieceEl = document.createElement('span');
+          pieceEl.style.fontSize = '30px';
+          pieceEl.textContent = pieces[piece];
+          squareEl.appendChild(pieceEl);
+  
+          rowEl.appendChild(squareEl);
         });
-    </script>
-</body>
-</html>
+  
+        boardContainer.appendChild(rowEl);
+      });
+    }
+  
+    function updateTurnDisplay() {
+      const turnDisplay = document.getElementById('turn-display');
+      turnDisplay.textContent = `${currentPlayer === 'w' ? 'White' : 'Black'}'s turn`;
+    }
+  
+    function updatePromotionButtons() {
+      if (!promotionSquare) return;
+      
+      const pieces = ['Q', 'R', 'B', 'N'];
+      pieces.forEach(piece => {
+        const btn = document.getElementById(`promote-${piece}`);
+        btn.innerHTML = `<span style="font-size: 24px">${currentPlayer === 'w' ? pieces[`w${piece}`] : pieces[`b${piece}`]}</span>`;
+      });
+    }
+  
+    function getValidMoves(row, col) {
+      const piece = board[row][col];
+      if (piece === 'empty' || piece[0] !== currentPlayer) {
+        return [];
+      }
+  
+      const pieceType = piece[1];
+      const moves = [];
+  
+      if (pieceType === 'P') {
+        const direction = currentPlayer === 'w' ? -1 : 1;
+        const startRow = currentPlayer === 'w' ? 6 : 1;
+        
+        if (row + direction >= 0 && row + direction < 8 && board[row + direction][col] === 'empty') {
+          moves.push({ row: row + direction, col });
+          
+          if (row === startRow && board[row + 2 * direction][col] === 'empty') {
+            moves.push({ row: row + 2 * direction, col });
+          }
+        }
+        
+        const captureOffsets = [{ row: direction, col: -1 }, { row: direction, col: 1 }];
+        captureOffsets.forEach(offset => {
+          const newRow = row + offset.row;
+          const newCol = col + offset.col;
+          if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+            const targetPiece = board[newRow][newCol];
+            if (targetPiece !== 'empty' && targetPiece[0] !== currentPlayer) {
+              moves.push({ row: newRow, col: newCol });
+            }
+          }
+        });
+      }
+  
+      if (pieceType === 'R' || pieceType === 'Q') {
+        const directions = [
+          { row: 0, col: 1 },
+          { row: 0, col: -1 },
+          { row: 1, col: 0 },
+          { row: -1, col: 0 }
+        ];
+        
+        directions.forEach(dir => {
+          for (let i = 1; i < 8; i++) {
+            const newRow = row + i * dir.row;
+            const newCol = col + i * dir.col;
+            
+            if (newRow < 0 || newRow >= 8 || newCol < 0 || newCol >= 8) {
+              break;
+            }
+            
+            const targetPiece = board[newRow][newCol];
+            if (targetPiece === 'empty') {
+              moves.push({ row: newRow, col: newCol });
+            } else if (targetPiece[0] !== currentPlayer) {
+              moves.push({ row: newRow, col: newCol });
+              break;
+            } else {
+              break;
+            }
+          }
+        });
+      }
+  
+      if (pieceType === 'B' || pieceType === 'Q') {
+        const directions = [
+          { row: 1, col: 1 },
+          { row: 1, col: -1 },
+          { row: -1, col: 1 },
+          { row: -1, col: -1 }
+        ];
+        
+        directions.forEach(dir => {
+          for (let i = 1; i < 8; i++) {
+            const newRow = row + i * dir.row;
+            const newCol = col + i * dir.col;
+            
+            if (newRow < 0 || newRow >= 8 || newCol < 0 || newCol >= 8) {
+              break;
+            }
+            
+            const targetPiece = board[newRow][newCol];
+            if (targetPiece === 'empty') {
+              moves.push({ row: newRow, col: newCol });
+            } else if (targetPiece[0] !== currentPlayer) {
+              moves.push({ row: newRow, col: newCol });
+              break;
+            } else {
+              break;
+            }
+          }
+        });
+      }
+  
+      if (pieceType === 'N') {
+        const knightOffsets = [
+          { row: -2, col: -1 }, { row: -2, col: 1 },
+          { row: -1, col: -2 }, { row: -1, col: 2 },
+          { row: 1, col: -2 }, { row: 1, col: 2 },
+          { row: 2, col: -1 }, { row: 2, col: 1 }
+        ];
+        
+        knightOffsets.forEach(offset => {
+          const newRow = row + offset.row;
+          const newCol = col + offset.col;
+          
+          if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+            const targetPiece = board[newRow][newCol];
+            if (targetPiece === 'empty' || targetPiece[0] !== currentPlayer) {
+              moves.push({ row: newRow, col: newCol });
+            }
+          }
+        });
+      }
+  
+      if (pieceType === 'K') {
+        const kingOffsets = [
+          { row: -1, col: -1 }, { row: -1, col: 0 }, { row: -1, col: 1 },
+          { row: 0, col: -1 }, { row: 0, col: 1 },
+          { row: 1, col: -1 }, { row: 1, col: 0 }, { row: 1, col: 1 }
+        ];
+        
+        kingOffsets.forEach(offset => {
+          const newRow = row + offset.row;
+          const newCol = col + offset.col;
+          
+          if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+            const targetPiece = board[newRow][newCol];
+            if (targetPiece === 'empty' || targetPiece[0] !== currentPlayer) {
+              moves.push({ row: newRow, col: newCol });
+            }
+          }
+        });
+  
+        if (castlingRights[currentPlayer].kingSide) {
+          let canCastle = true;
+          for (let i = 1; i < 3; i++) {
+            if (board[row][col + i] !== 'empty') {
+              canCastle = false;
+              break;
+            }
+          }
+          if (canCastle) {
+            moves.push({ row, col: col + 2, specialMove: 'castleKing' });
+          }
+        }
+  
+        if (castlingRights[currentPlayer].queenSide) {
+          let canCastle = true;
+          for (let i = 1; i < 4; i++) {
+            if (board[row][col - i] !== 'empty') {
+              canCastle = false;
+              break;
+            }
+          }
+          if (canCastle) {
+            moves.push({ row, col: col - 2, specialMove: 'castleQueen' });
+          }
+        }
+      }
+  
+      return moves;
+    }
+  
+    function handleSelection() {
+      if (promotionSquare) return;
+  
+      const { row, col } = cursorPos;
+      const piece = board[row][col];
+  
+      if (!selectedSquare) {
+        if (piece !== 'empty' && piece[0] === currentPlayer) {
+          selectedSquare = { row, col };
+          validMoves = getValidMoves(row, col);
+          renderBoard();
+        }
+      } else {
+        const isValidMove = validMoves.some(move => move.row === row && move.col === col);
+        
+        if (isValidMove) {
+          movePiece(selectedSquare.row, selectedSquare.col, row, col);
+        } else if (piece !== 'empty' && piece[0] === currentPlayer) {
+          selectedSquare = { row, col };
+          validMoves = getValidMoves(row, col);
+          renderBoard();
+        }
+      }
+    }
+  
+    function movePiece(fromRow, fromCol, toRow, toCol) {
+      const piece = board[fromRow][fromCol];
+      const pieceType = piece[1];
+  
+      const newBoard = JSON.parse(JSON.stringify(board));
+      newBoard[fromRow][fromCol] = 'empty';
+      
+      const specialMove = validMoves.find(move => move.row === toRow && move.col === toCol)?.specialMove;
+      
+      if (specialMove === 'castleKing') {
+        newBoard[toRow][toCol] = piece;
+        newBoard[toRow][7] = 'empty';
+        newBoard[toRow][toCol - 1] = currentPlayer + 'R';
+      } else if (specialMove === 'castleQueen') {
+        newBoard[toRow][toCol] = piece;
+        newBoard[toRow][0] = 'empty';
+        newBoard[toRow][toCol + 1] = currentPlayer + 'R';
+      } else {
+        newBoard[toRow][toCol] = piece;
+      }
+  
+      if (pieceType === 'K') {
+        kingPositions[currentPlayer] = { row: toRow, col: toCol };
+        castlingRights[currentPlayer] = { kingSide: false, queenSide: false };
+      }
+      
+      if (pieceType === 'R') {
+        if (fromRow === (currentPlayer === 'w' ? 7 : 0)) {
+          if (fromCol === 0) {
+            castlingRights[currentPlayer].queenSide = false;
+          } else if (fromCol === 7) {
+            castlingRights[currentPlayer].kingSide = false;
+          }
+        }
+      }
+  
+      board = newBoard;
+      selectedSquare = null;
+      validMoves = [];
+      
+      if (pieceType === 'P' && (toRow === 0 || toRow === 7)) {
+        promotionSquare = { row: toRow, col: toCol };
+        showPromotionDialog();
+      } else {
+        currentPlayer = currentPlayer === 'w' ? 'b' : 'w';
+        updateTurnDisplay();
+      }
+      
+      renderBoard();
+    }
+  
+    function showPromotionDialog() {
+      const dialog = document.getElementById('promotion-dialog');
+      dialog.style.display = 'block';
+      updatePromotionButtons();
+    }
+  
+    function hidePromotionDialog() {
+      const dialog = document.getElementById('promotion-dialog');
+      dialog.style.display = 'none';
+    }
+  
+    function handlePromotion(promotionPiece) {
+      if (!promotionSquare) return;
+  
+      const { row, col } = promotionSquare;
+      const newBoard = JSON.parse(JSON.stringify(board));
+      newBoard[row][col] = currentPlayer + promotionPiece;
+      
+      board = newBoard;
+      promotionSquare = null;
+      hidePromotionDialog();
+      
+      currentPlayer = currentPlayer === 'w' ? 'b' : 'w';
+      updateTurnDisplay();
+      renderBoard();
+    }
+  
+    function newGame() {
+      board = JSON.parse(JSON.stringify(initialBoard));
+      currentPlayer = 'w';
+      selectedSquare = null;
+      cursorPos = { row: 7, col: 0 };
+      validMoves = [];
+      castlingRights = {
+        w: { kingSide: true, queenSide: true },
+        b: { kingSide: true, queenSide: true }
+      };
+      kingPositions = {
+        w: { row: 7, col: 4 },
+        b: { row: 0, col: 4 }
+      };
+      promotionSquare = null;
+      hidePromotionDialog();
+      renderBoard();
+      updateTurnDisplay();
+    }
+  
+    function switchSides() {
+      currentPlayer = currentPlayer === 'w' ? 'b' : 'w';
+      selectedSquare = null;
+      validMoves = [];
+      renderBoard();
+      updateTurnDisplay();
+    }
+  
+    function flashArrow(arrowId) {
+      const arrow = document.querySelector(`#${arrowId} .arrow-btn`);
+      arrow.style.backgroundColor = '#90CAF9';
+      setTimeout(() => {
+        arrow.style.backgroundColor = '#F5F5F5';
+      }, 200);
+    }
+  
+    function handleKeyDown(e) {
+      if (promotionSquare) {
+        if (e.key === 'q' || e.key === 'Q') {
+          handlePromotion('Q');
+        } else if (e.key === 'r' || e.key === 'R') {
+          handlePromotion('R');
+        } else if (e.key === 'b' || e.key === 'B') {
+          handlePromotion('B');
+        } else if (e.key === 'n' || e.key === 'N') {
+          handlePromotion('N');
+        }
+        return;
+      }
+  
+      switch (e.key) {
+        case 'ArrowUp':
+          flashArrow('up-arrow');
+          cursorPos.row = Math.max(0, cursorPos.row - 1);
+          renderBoard();
+          break;
+        case 'ArrowDown':
+          flashArrow('down-arrow');
+          cursorPos.row = Math.min(7, cursorPos.row + 1);
+          renderBoard();
+          break;
+        case 'ArrowLeft':
+          flashArrow('left-arrow');
+          cursorPos.col = Math.max(0, cursorPos.col - 1);
+          renderBoard();
+          break;
+        case 'ArrowRight':
+          flashArrow('right-arrow');
+          cursorPos.col = Math.min(7, cursorPos.col + 1);
+          renderBoard();
+          break;
+        case 'Enter':
+          handleSelection();
+          break;
+        case 'Escape':
+          selectedSquare = null;
+          validMoves = [];
+          renderBoard();
+          break;
+      }
+    }
+  
+    document.addEventListener('keydown', handleKeyDown);
+    createGameUI();
+  });

@@ -40,6 +40,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 async def get_index():
     """Serve the main frontend page"""
+    # Serve our wrapper that will load the original index.html via JavaScript
+    return FileResponse("static/wrapper.html")
+
+@app.get("/original")
+async def get_original_index():
+    """Serve the original index.html for debugging"""
     return FileResponse("static/index.html")
 
 @app.get("/game_state")

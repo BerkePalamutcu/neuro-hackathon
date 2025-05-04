@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess BCI Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .disconnected {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="connection-status" class="connection-status disconnected">Connecting...</div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const pieces = {
+              wP: '♙', wR: '♖', wN: '♘', wB: '♗', wQ: '♕', wK: '♔',
+              bP: '♟', bR: '♜', bN: '♞', bB: '♝', bQ: '♛', bK: '♚',
+              empty: ''
+            };
+          
+            const initialBoard = [
+              ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
+              ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'],
+              ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+              ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+              ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+              ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+              ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'],
+              ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR']
+            ];
+          
+            let board = JSON.parse(JSON.stringify(initialBoard));
+            let currentPlayer = 'w';
+            let selectedSquare = null;
+            let cursorPos = { row: 7, col: 0 };
+            let validMoves = [];
+            let arrowPressed = null;
+            let castlingRights = {
+              w: { kingSide: true, queenSide: true },
+              b: { kingSide: true, queenSide: true }
+            };
+            let kingPositions = {
+              w: { row: 7, col: 4 },
+              b: { row: 0, col: 4 }
+            };
+            let promotionSquare = null;
+          
+            let boardFlipped = false;
+            
+            function createGameUI() {
+              const gameContainer = document.createElement('div');
+              gameContainer.id = 'chess-game';
+              gameContainer.style.display = 'flex';
+              gameContainer.style.flexDirection = 'column';
+              gameContainer.style.alignItems = 'center';
+              document.body.appendChild(gameContainer);
+          
+              const turnDisplay = document.createElement('div');
+              turnDisplay.id = 'turn-display';
+              turnDisplay.style.marginBottom = '16px';
+              turnDisplay.style.fontSize = '28px';
+              turnDisplay.style.fontWeight = 'bold';
+              gameContainer.appendChild(turnDisplay);
+              
+              // Create a container for the board and arrows
+              const boardAndArrowsContainer = document.createElement('div');
+              boardAndArrowsContainer.style.display = 'grid';
+              boardAndArrowsContainer.style.gridTemplateColumns = '100px 400px 100px';
+              boardAndArrowsContainer.style.gridTemplateRows = '100px 400px 100px';
+              boardAndArrowsContainer.style.gap = '10px';
+              boardAndArrowsContainer.style.justifyItems = 'center';
+              boardAndArrowsContainer.style.alignItems = 'center';
+              gameContainer.appendChild(boardAndArrowsContainer);
+              
+              // Up arrow (top middle)
+              const upArrow = document.createElement('div');
+              upArrow.id = 'up-arrow';
+              upArrow.style.gridColumn = '2';
+              upArrow.style.gridRow = '1';
+              upArrow.innerHTML = `
+                <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; cursor: pointer;">
+                  <img src="/static/images/Green arrow up.png" alt="Up" width="90" height="90">
+                </div>
+              `;
+              boardAndArrowsContainer.appendChild(upArrow);
+              
+              // Left arrow (middle left)
+              const leftArrow = document.createElement('div');
+              leftArrow.id = 'left-arrow';
+              leftArrow.style.gridColumn = '1';
+              leftArrow.style.gridRow = '2';
+              leftArrow.innerHTML = `
+                <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; cursor: pointer;">
+                  <img src="/static/images/blue arrow left.png" alt="Left" width="90" height="90">
+                </div>
+              `;
+              boardAndArrowsContainer.appendChild(leftArrow);
+              
+              // Chess board (center)
+              const boardContainer = document.createElement('div');
+              boardContainer.id = 'board-container';
+              boardContainer.style.gridColumn = '2';
+              boardContainer.style.gridRow = '2';
+              boardContainer.style.border = '6px solid #5D4037';
+              boardContainer.style.width = '400px';
+              boardContainer.style.height = '400px';
+              boardAndArrowsContainer.appendChild(boardContainer);
+              
+              // Right arrow (middle right)
+              const rightArrow = document.createElement('div');
+              rightArrow.id = 'right-arrow';
+              rightArrow.style.gridColumn = '3';
+              rightArrow.style.gridRow = '2';
+              rightArrow.innerHTML = `
+                <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; cursor: pointer;">
+                  <img src="/static/images/red arrow right.png" alt="Right" width="90" height="90">
+                </div>
+              `;
+              boardAndArrowsContainer.appendChild(rightArrow);
+              
+              // Down arrow (bottom middle)
+              const downArrow = document.createElement('div');
+              downArrow.id = 'down-arrow';
+              downArrow.style.gridColumn = '2';
+              downArrow.style.gridRow = '3';
+              downArrow.innerHTML = `
+                <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; cursor: pointer;">
+                  <img src="/static/images/yellow arrow down.png" alt="Down" width="90" height="90">
+                </div>
+              `;
+              boardAndArrowsContainer.appendChild(downArrow);
+              
+              // Add Select/Deselect buttons
+              const actionButtonsContainer = document.createElement('div');
+              actionButtonsContainer.style.display = 'flex';
+              actionButtonsContainer.style.justifyContent = 'center';
+              actionButtonsContainer.style.gap = '20px';
+              actionButtonsContainer.style.marginTop = '20px';
+              gameContainer.appendChild(actionButtonsContainer);
+              
+              // Select button (CANCEL unselected)
+              const selectButton = document.createElement('div');
+              selectButton.id = 'select-button';
+              selectButton.style.display = 'flex';
+              selectButton.style.justifyContent = 'center';
+              selectButton.style.alignItems = 'center';
+              selectButton.style.cursor = 'pointer';
+              selectButton.innerHTML = `<img src="/static/images/CANCEL unselected.png" alt="Select" width="150" height="60" id="select-img">`;
+              actionButtonsContainer.appendChild(selectButton);
+              
+              // Deselect button (CONFIRM button unselected - initially disabled)
+              const deselectButton = document.createElement('div');
+              deselectButton.id = 'deselect-button';
+              deselectButton.style.display = 'flex';
+              deselectButton.style.justifyContent = 'center';
+              deselectButton.style.alignItems = 'center';
+              deselectButton.style.cursor = 'pointer';
+              deselectButton.innerHTML = `<img src="/static/images/CONFIRM button unselected.png" alt="Deselect" width="150" height="60" id="deselect-img">`;
+              actionButtonsContainer.appendChild(deselectButton);
+              
+              // Game control buttons
+              const buttonContainer = document.createElement('div');
+              buttonContainer.style.marginTop = '20px';
+              buttonContainer.style.display = 'flex';
+              buttonContainer.style.gap = '20px';
+              gameContainer.appendChild(buttonContainer);
+          
+              const newGameBtn = document.createElement('button');
+              newGameBtn.textContent = 'New Game';
+              newGameBtn.style.padding = '12px 24px';
+              newGameBtn.style.backgroundColor = '#2196F3';
+              newGameBtn.style.color = 'white';
+              newGameBtn.style.border = 'none';
+              newGameBtn.style.borderRadius = '4px';
+              newGameBtn.style.cursor = 'pointer';
+              newGameBtn.style.fontSize = '18px';
+              newGameBtn.onclick = newGame;
+              buttonContainer.appendChild(newGameBtn);
+          
+              const switchSidesBtn = document.createElement('button');
+              switchSidesBtn.textContent = 'Switch Sides';
+              switchSidesBtn.style.padding = '12px 24px';
+              switchSidesBtn.style.backgroundColor = '#FF9800';
+              switchSidesBtn.style.color = 'white';
+              switchSidesBtn.style.border = 'none';
+              switchSidesBtn.style.borderRadius = '4px';
+              switchSidesBtn.style.cursor = 'pointer';
+              switchSidesBtn.style.fontSize = '18px';
+              switchSidesBtn.onclick = switchSides;
+              buttonContainer.appendChild(switchSidesBtn);
+          
+              createPromotionDialog(gameContainer);
+              renderBoard();
+              updateTurnDisplay();
+              
+              // Initialize WebSocket connection
+              initWebSocket();
+            }
+          
+            function createArrowButtons(container) {
+              const upArrow = document.createElement('div');
+              upArrow.id = 'up-arrow';
+              upArrow.style.gridColumnStart = '2';
+              upArrow.style.display = 'flex';
+              upArrow.style.justifyContent = 'center';
+              upArrow.innerHTML = `
+                <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #9E9E9E; border-radius: 4px; background-color: #F5F5F5;">
+                  ↑
+                </div>
+              `;
+              container.appendChild(upArrow);
+          
+              const arrowRow = document.createElement('div');
+              arrowRow.style.gridColumnStart = '1';
+              arrowRow.style.gridColumnEnd = '4';
+              arrowRow.style.gridRowStart = '2';
+              arrowRow.style.display = 'grid';
+              arrowRow.style.gridTemplateColumns = 'repeat(3, 1fr)';
+              container.appendChild(arrowRow);
+          
+              const leftArrow = document.createElement('div');
+              leftArrow.id = 'left-arrow';
+              leftArrow.innerHTML = `
+                <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #9E9E9E; border-radius: 4px; background-color: #F5F5F5;">
+                  ←
+                </div>
+              `;
+              arrowRow.appendChild(leftArrow);
+          
+              const downArrow = document.createElement('div');
+              downArrow.id = 'down-arrow';
+              downArrow.innerHTML = `
+                <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #9E9E9E; border-radius: 4px; background-color: #F5F5F5;">
+                  ↓
+                </div>
+              `;
+              arrowRow.appendChild(downArrow);
+          
+              const rightArrow = document.createElement('div');
+              rightArrow.id = 'right-arrow';
+              rightArrow.innerHTML = `
+                <div class="arrow-btn" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #9E9E9E; border-radius: 4px; background-color: #F5F5F5;">
+                  →
+                </div>
+              `;
+              arrowRow.appendChild(rightArrow);
+            }
+          
+            function createPromotionDialog(container) {
+              const promotionDialog = document.createElement('div');
+              promotionDialog.id = 'promotion-dialog';
+              promotionDialog.style.position = 'absolute';
+              promotionDialog.style.top = '50%';
+              promotionDialog.style.left = '50%';
+              promotionDialog.style.transform = 'translate(-50%, -50%)';
+              promotionDialog.style.backgroundColor = 'white';
+              promotionDialog.style.padding = '16px';
+              promotionDialog.style.border = '2px solid black';
+              promotionDialog.style.borderRadius = '4px';
+              promotionDialog.style.display = 'none';
+              
+              const dialogTitle = document.createElement('div');
+              dialogTitle.textContent = 'Choose a piece for promotion';
+              dialogTitle.style.textAlign = 'center';
+              dialogTitle.style.marginBottom = '8px';
+              promotionDialog.appendChild(dialogTitle);
+          
+              const pieceContainer = document.createElement('div');
+              pieceContainer.style.display = 'flex';
+              pieceContainer.style.justifyContent = 'center';
+              pieceContainer.style.gap = '16px';
+              promotionDialog.appendChild(pieceContainer);
+          
+              const pieces = ['Q', 'R', 'B', 'N'];
+              pieces.forEach(piece => {
+                const pieceBtn = document.createElement('button');
+                pieceBtn.id = `promote-${piece}`;
+                pieceBtn.style.width = '48px';
+                pieceBtn.style.height = '48px';
+                pieceBtn.style.display = 'flex';
+                pieceBtn.style.alignItems = 'center';
+                pieceBtn.style.justifyContent = 'center';
+                pieceBtn.style.border = '1px solid #9E9E9E';
+                pieceBtn.setAttribute('data-piece', piece);
+                pieceBtn.onclick = () => handlePromotion(piece);
+                pieceContainer.appendChild(pieceBtn);
+              });
+          
+              container.appendChild(promotionDialog);
+            }
+          
+            function renderBoard() {
+              const boardContainer = document.getElementById('board-container');
+              boardContainer.innerHTML = '';
+              
+              // Determine the display order based on board orientation
+              let displayRows = [];
+              for (let i = 0; i < 8; i++) {
+                // If boardFlipped is false, white pieces are at the bottom (rows 7,6,5...)
+                // If boardFlipped is true, black pieces are at the bottom (rows 0,1,2...)
+                const rowIndex = boardFlipped ? i : 7 - i;
+                displayRows.push(rowIndex);
+              }
+              
+              displayRows.forEach(rowIndex => {
+                const rowEl = document.createElement('div');
+                rowEl.style.display = 'flex';
+                rowEl.style.width = '100%';
+                rowEl.style.height = '50px'; // Adjusted square size
+                
+                for (let colIndex = 0; colIndex < 8; colIndex++) {
+                  // Adjust column index based on board orientation
+                  const displayColIndex = boardFlipped ? 7 - colIndex : colIndex;
+                  
+                  const squareEl = document.createElement('div');
+                  squareEl.dataset.row = rowIndex;
+                  squareEl.dataset.col = displayColIndex;
+                  squareEl.style.display = 'flex';
+                  squareEl.style.alignItems = 'center';
+                  squareEl.style.justifyContent = 'center';
+                  squareEl.style.width = '50px'; // Adjusted square size
+                  squareEl.style.height = '50px'; // Adjusted square size
+                  squareEl.style.position = 'relative';
+                  squareEl.style.backgroundColor = (rowIndex + displayColIndex) % 2 === 0 ? '#FFECB3' : '#8D6E63';
+          
+                  const piece = board[rowIndex][displayColIndex];
+                  const isSelected = selectedSquare && selectedSquare.row === rowIndex && selectedSquare.col === displayColIndex;
+                  const isCursor = cursorPos.row === rowIndex && cursorPos.col === displayColIndex;
+                  const isValidMove = validMoves.some(move => move.row === rowIndex && move.col === displayColIndex);
+          
+                  if (isCursor && !isSelected) {
+                    const cursorIndicator = document.createElement('div');
+                    cursorIndicator.style.position = 'absolute';
+                    cursorIndicator.style.width = '30px'; // Adjusted indicator size
+                    cursorIndicator.style.height = '30px'; // Adjusted indicator size
+                    cursorIndicator.style.border = '3px solid #4CAF50';
+                    cursorIndicator.style.borderRadius = '50%';
+                    cursorIndicator.style.opacity = '0.7';
+                    squareEl.appendChild(cursorIndicator);
+                  }
+          
+                  if (isSelected) {
+                    const selectedIndicator = document.createElement('div');
+                    selectedIndicator.style.position = 'absolute';
+                    selectedIndicator.style.width = '100%';
+                    selectedIndicator.style.height = '100%';
+                    selectedIndicator.style.backgroundColor = '#81C784';
+                    selectedIndicator.style.opacity = '0.3';
+                    squareEl.appendChild(selectedIndicator);
+                  }
+          
+                  if (isValidMove) {
+                    const moveIndicator = document.createElement('div');
+                    moveIndicator.style.position = 'absolute';
+                    moveIndicator.style.width = '30px'; // Adjusted indicator size
+                    moveIndicator.style.height = '30px'; // Adjusted indicator size
+                    moveIndicator.style.backgroundColor = '#2196F3';
+                    moveIndicator.style.opacity = '0.3';
+                    moveIndicator.style.borderRadius = '50%';
+                    squareEl.appendChild(moveIndicator);
+                  }
+          
+                  const pieceEl = document.createElement('span');
+                  pieceEl.style.fontSize = '36px'; // Adjusted piece size
+                  pieceEl.textContent = pieces[piece];
+                  squareEl.appendChild(pieceEl);
+          
+                  rowEl.appendChild(squareEl);
+                }
+          
+                boardContainer.appendChild(rowEl);
+              });
+              
+              // Update Select/Deselect button states
+              updateSelectDeselectButtons();
+            }
+          
+            function updateTurnDisplay() {
+              const turnDisplay = document.getElementById('turn-display');
+              turnDisplay.textContent = `${currentPlayer === 'w' ? 'White' : 'Black'}'s turn`;
+            }
+          
+            function updatePromotionButtons() {
+              if (!promotionSquare) return;
+              
+              const pieces = ['Q', 'R', 'B', 'N'];
+              pieces.forEach(piece => {
+                const btn = document.getElementById(`promote-${piece}`);
+                btn.innerHTML = `<span style="font-size: 24px">${currentPlayer === 'w' ? pieces[`w${piece}`] : pieces[`b${piece}`]}</span>`;
+              });
+            }
+          
+            function getValidMoves(row, col) {
+              // Use backend API to get valid moves
+              return fetch(`/valid_moves?row=${row}&col=${col}`)
+                .then(response => response.json())
+                .then(data => {
+                  validMoves = data.moves;
+                  return validMoves;
+                })
+                .catch(error => {
+                  console.error('Error getting valid moves:', error);
+                  return [];
+                });
+            }
+          
+            function handleSelection() {
+              if (promotionSquare) return;
+          
+              const { row, col } = cursorPos;
+              const piece = board[row][col];
+          
+              if (!selectedSquare) {
+                if (piece !== 'empty' && piece[0] === currentPlayer) {
+                  selectedSquare = { row, col };
+                  getValidMoves(row, col).then(() => {
+                    renderBoard(); // This will also update the Select/Deselect buttons
+                  });
+                }
+              } else {
+                const isValidMove = validMoves.some(move => move.row === row && move.col === col);
+                
+                if (isValidMove) {
+                  movePiece(selectedSquare.row, selectedSquare.col, row, col);
+                } else if (piece !== 'empty' && piece[0] === currentPlayer) {
+                  selectedSquare = { row, col };
+                  getValidMoves(row, col).then(() => {
+                    renderBoard(); // This will also update the Select/Deselect buttons
+                  });
+                }
+              }
+            }
+          
+            function movePiece(fromRow, fromCol, toRow, toCol) {
+              // Use backend API to make the move
+              const moveData = {
+                from_row: fromRow,
+                from_col: fromCol,
+                to_row: toRow,
+                to_col: toCol,
+                promotion: null
+              };
+              
+              fetch('/move', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(moveData)
+              })
+                .then(response => response.json())
+                .then(data => {
+                  if (data.success) {
+                    // Reset selection state
+                    selectedSquare = null;
+                    validMoves = [];
+                    
+                    // The game state will be updated via WebSocket
+                  }
+                })
+                .catch(error => {
+                  console.error('Error making move:', error);
+                });
+            }
+          
+            function showPromotionDialog() {
+              const dialog = document.getElementById('promotion-dialog');
+              dialog.style.display = 'block';
+              updatePromotionButtons();
+            }
+          
+            function hidePromotionDialog() {
+              const dialog = document.getElementById('promotion-dialog');
+              dialog.style.display = 'none';
+            }
+          
+            function handlePromotion(promotionPiece) {
+              if (!promotionSquare) return;
+          
+              const { row, col } = promotionSquare;
+              
+              // Use backend API to make the promotion move
+              const moveData = {
+                from_row: selectedSquare.row,
+                from_col: selectedSquare.col,
+                to_row: row,
+                to_col: col,
+                promotion: promotionPiece.toLowerCase()
+              };
+              
+              fetch('/move', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(moveData)
+              })
+                .then(response => response.json())
+                .then(data => {
+                  if (data.success) {
+                    // Reset promotion state
+                    promotionSquare = null;
+                    selectedSquare = null;
+                    validMoves = [];
+                    hidePromotionDialog();
+                    
+                    // The game state will be updated via WebSocket
+                  }
+                })
+                .catch(error => {
+                  console.error('Error making promotion move:', error);
+                });
+            }
+          
+            function newGame() {
+              fetch('/new_game', {
+                method: 'POST'
+              })
+                .then(response => response.json())
+                .then(data => {
+                  if (data.success) {
+                    // Reset local state
+                    selectedSquare = null;
+                    cursorPos = { row: 7, col: 0 };
+                    validMoves = [];
+                    promotionSquare = null;
+                    hidePromotionDialog();
+                    
+                    // The game state will be updated via WebSocket
+                  }
+                })
+                .catch(error => {
+                  console.error('Error starting new game:', error);
+                });
+            }
+          
+            function switchSides() {
+              // Flip the board orientation
+              boardFlipped = !boardFlipped;
+              
+              // Reset selection state
+              selectedSquare = null;
+              validMoves = [];
+              
+              // Render the board with the new orientation
+              renderBoard();
+              updateTurnDisplay();
+            }
+            
+            function updateSelectDeselectButtons() {
+              const selectImg = document.getElementById('select-img');
+              const deselectImg = document.getElementById('deselect-img');
+              
+              if (selectedSquare) {
+                // A piece is selected - activate deselect button, deactivate select button
+                selectImg.src = '/static/images/CANCEL selected.png';
+                deselectImg.src = '/static/images/CONFIRM button selected.png';
+              } else {
+                // No piece selected - activate select button, deactivate deselect button
+                selectImg.src = '/static/images/CANCEL unselected.png';
+                deselectImg.src = '/static/images/CONFIRM button unselected.png';
+              }
+            }
+          
+            function flashArrow(arrowId) {
+              const arrow = document.querySelector(`#${arrowId} img`);
+              if (!arrow) return;
+              
+              // Simple flash effect
+              arrow.style.transition = 'transform 0.1s ease-in-out';
+              arrow.style.transform = 'scale(1.2)';
+              
+              setTimeout(() => {
+                arrow.style.transform = 'scale(1)';
+              }, 200);
+            }
+          
+            function handleKeyDown(e) {
+              // Prevent default scrolling behavior for arrow keys and Enter key
+              if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Enter'].includes(e.key)) {
+                e.preventDefault();
+              }
+              
+              // Log the key press for debugging
+              console.log('Key pressed:', e.key, 'Key code:', e.keyCode);
+              
+              if (promotionSquare) {
+                if (e.key === 'q' || e.key === 'Q') {
+                  handlePromotion('Q');
+                } else if (e.key === 'r' || e.key === 'R') {
+                  handlePromotion('R');
+                } else if (e.key === 'b' || e.key === 'B') {
+                  handlePromotion('B');
+                } else if (e.key === 'n' || e.key === 'N') {
+                  handlePromotion('N');
+                }
+                return;
+              }
+          
+              // Handle both key and keyCode for better cross-browser compatibility
+              if (e.key === 'ArrowUp' || e.keyCode === 38) {
+                flashArrow('up-arrow');
+                cursorPos.row = Math.min(7, cursorPos.row + 1); // Changed: now moves down
+                renderBoard();
+              } else if (e.key === 'ArrowDown' || e.keyCode === 40) {
+                flashArrow('down-arrow');
+                cursorPos.row = Math.max(0, cursorPos.row - 1); // Changed: now moves up
+                renderBoard();
+              } else if (e.key === 'ArrowLeft' || e.keyCode === 37) {
+                flashArrow('left-arrow');
+                cursorPos.col = Math.max(0, cursorPos.col - 1);
+                renderBoard();
+              } else if (e.key === 'ArrowRight' || e.keyCode === 39) {
+                flashArrow('right-arrow');
+                cursorPos.col = Math.min(7, cursorPos.col + 1);
+                renderBoard();
+              } else if (e.key === 'Enter' || e.keyCode === 13) {
+                console.log('Enter key pressed, handling selection');
+                handleSelection();
+                // Select/Deselect buttons will be updated by renderBoard()
+              } else if (e.key === 'Escape' || e.keyCode === 27) {
+                if (selectedSquare) {
+                  // Deselect the piece
+                  selectedSquare = null;
+                  validMoves = [];
+                  renderBoard(); // This will update the Select/Deselect buttons
+                }
+              }
+            }
+            
+            // Initialize WebSocket connection
+            function initWebSocket() {
+              const WS_URL = (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host;
+              const socket = new WebSocket(`${WS_URL}/ws`);
+              
+              socket.onopen = () => {
+                console.log('WebSocket connection established');
+                const connectionStatus = document.getElementById('connection-status');
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.className = 'connection-status connected';
+                
+                // Fetch initial game state
+                fetchGameState();
+              };
+              
+              socket.onclose = () => {
+                console.log('WebSocket connection closed');
+                const connectionStatus = document.getElementById('connection-status');
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.className = 'connection-status disconnected';
+                
+                // Try to reconnect after a delay
+                setTimeout(initWebSocket, 5000);
+              };
+              
+              socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+              };
+              
+              socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log('WebSocket message received:', data);
+                
+                if (data.type === 'game_state') {
+                  // Update the board from the backend state
+                  updateBoardFromBackend(data.state);
+                }
+              };
+            }
+            
+            // Fetch game state from the server
+            function fetchGameState() {
+              fetch('/game_state')
+                .then(response => response.json())
+                .then(data => {
+                  updateBoardFromBackend(data);
+                })
+                .catch(error => {
+                  console.error('Error fetching game state:', error);
+                });
+            }
+            
+            // Update the board from backend state
+            function updateBoardFromBackend(gameState) {
+              if (!gameState || !gameState.board) return;
+              
+              // Convert backend board format to frontend format
+              board = [];
+              
+              for (let row = 0; row < 8; row++) {
+                const boardRow = [];
+                for (let col = 0; col < 8; col++) {
+                  const piece = gameState.board[row][col];
+                  if (piece) {
+                    // Convert from backend piece format to frontend format
+                    const color = piece.color === 'white' ? 'w' : 'b';
+                    let type = '';
+                    
+                    switch (piece.type) {
+                      case 'pawn': type = 'P'; break;
+                      case 'rook': type = 'R'; break;
+                      case 'knight': type = 'N'; break;
+                      case 'bishop': type = 'B'; break;
+                      case 'queen': type = 'Q'; break;
+                      case 'king': type = 'K'; break;
+                    }
+                    
+                    boardRow.push(color + type);
+                  } else {
+                    boardRow.push('empty');
+                  }
+                }
+                board.push(boardRow);
+              }
+              
+              // Update current player
+              currentPlayer = gameState.currentPlayer === 'white' ? 'w' : 'b';
+              
+              // Update UI
+              renderBoard();
+              updateTurnDisplay();
+            }
+          
+            document.addEventListener('keydown', handleKeyDown);
+            createGameUI();
+        });
+    </script>
+</body>
+</html>
